@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Ring } from "../core/ring";
 import type { CoreEvent } from "../core/events";
 import type { RingSnapshot } from "../core/types";
+import { applySeed } from "../seed";
 
 export type Speed = 0.25 | 0.5 | 1 | 2 | 4;
 
@@ -22,7 +23,7 @@ type Actions = {
   setVnodesPerNode: (n: number) => void;
   setSpeed: (s: Speed) => void;
   toggleStepMode: () => void;
-  reset: (seed: (r: Ring) => void) => void;
+  reset: (seed?: (r: Ring) => void) => void;
 };
 
 /**
@@ -45,6 +46,8 @@ const makeInitialRing = (): Ring => {
 
 export const useRingStore = create<State & Actions>((set, get) => {
   const ring = makeInitialRing();
+  applySeed(ring);
+  nextNodeOrdinal = ring.snapshot().nodeIds.length + 1;
 
   const refresh = (events: CoreEvent[]) =>
     set({ snapshot: ring.snapshot(), lastEvents: events });
@@ -90,10 +93,11 @@ export const useRingStore = create<State & Actions>((set, get) => {
     setSpeed: (s) => set({ speed: s }),
     toggleStepMode: () => set((s) => ({ stepMode: !s.stepMode })),
 
-    reset: (seed) => {
+    reset: (seed?: (r: Ring) => void) => {
       nextNodeOrdinal = 1;
       const fresh = makeInitialRing();
-      seed(fresh);
+      (seed ?? applySeed)(fresh);
+      nextNodeOrdinal = fresh.snapshot().nodeIds.length + 1;
       set({
         ring: fresh,
         snapshot: fresh.snapshot(),
