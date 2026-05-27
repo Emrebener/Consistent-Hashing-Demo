@@ -1,3 +1,5 @@
+<img width="2560" height="1440" alt="cons-hash-demo" src="https://github.com/user-attachments/assets/54aca1d7-0354-401d-8942-bbd9477605c6" />
+
 # Consistent Hashing Demo
 
 Interactive, browser-only visualization of Cassandra/DynamoDB-style consistent hashing.
