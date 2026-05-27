@@ -4,6 +4,8 @@ import { useRingStore } from "../state/store";
 import { colorForNode } from "../lib/palette";
 import { DURATION, scaledSeconds } from "../lib/animation";
 import type { HashTrace } from "../core/events";
+import { useHoverStore } from "../state/hover";
+import { hashKey } from "../core/hash";
 
 const RING_RADIUS = 180;
 const VIEW = 480;
@@ -23,6 +25,8 @@ export function RingCanvas() {
   const snapshot = useRingStore((s) => s.snapshot);
   const lastEvents = useRingStore((s) => s.lastEvents);
   const speed = useRingStore((s) => s.speed);
+  const hoveredNodeId = useHoverStore((s) => s.hoveredNodeId);
+  const hoveredKey = useHoverStore((s) => s.hoveredKey);
 
   const [probe, setProbe] = useState<Probe | null>(null);
 
@@ -63,21 +67,52 @@ export function RingCanvas() {
         const p = ringPoint(t.position, RING_RADIUS);
         const color = colorForNode(t.nodeId);
         const isReplica = probe?.trace.replicas.includes(t.nodeId) ?? false;
+        const isHoveredNode = hoveredNodeId === t.nodeId;
         return (
           <motion.circle
             key={`${t.nodeId}#${t.vnodeIndex}`}
             cx={p.x}
             cy={p.y}
-            r={isReplica ? 6 : 4}
             fill={color}
-            stroke="#0a0a0a"
-            strokeWidth={1}
-            initial={{ r: 0 }}
-            animate={{ r: isReplica ? 6 : 4 }}
-            transition={{ duration: scaledSeconds(DURATION.vnodeFanInPerToken, speed) }}
+            stroke={isHoveredNode ? "#ffffff" : "#0a0a0a"}
+            strokeWidth={isHoveredNode ? 1.5 : 1}
+            animate={{ r: isReplica || isHoveredNode ? 7 : 4 }}
+            transition={{ duration: 0.18 }}
           />
         );
       })}
+
+      {hoveredKey && snapshot.ownership[hoveredKey] && (
+        <g>
+          {(() => {
+            const keyHash = hashKey(hoveredKey);
+            const keyPt = ringPoint(keyHash, RING_RADIUS - 12);
+            const owners = snapshot.ownership[hoveredKey] ?? [];
+            return owners.map((ownerId) => {
+              // Pick the owner's vnode whose position is closest clockwise from the key.
+              const candidates = snapshot.tokens.filter((t) => t.nodeId === ownerId);
+              if (candidates.length === 0) return null;
+              const best = candidates.reduce((acc, t) => {
+                const dist = (t.position - keyHash + 2 ** 32) % 2 ** 32;
+                return dist < acc.dist ? { t, dist } : acc;
+              }, { t: candidates[0], dist: (candidates[0].position - keyHash + 2 ** 32) % 2 ** 32 });
+              const ownerPt = ringPoint(best.t.position, RING_RADIUS);
+              return (
+                <line
+                  key={`arc-${hoveredKey}-${ownerId}`}
+                  x1={keyPt.x}
+                  y1={keyPt.y}
+                  x2={ownerPt.x}
+                  y2={ownerPt.y}
+                  stroke="#ffffff"
+                  strokeOpacity={0.5}
+                  strokeWidth={1.2}
+                />
+              );
+            });
+          })()}
+        </g>
+      )}
 
       {Object.keys(snapshot.ownership).map((k) => {
         const owners = snapshot.ownership[k];

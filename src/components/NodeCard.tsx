@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { colorForNode } from "../lib/palette";
 import type { RingSnapshot } from "../core/types";
+import { useHoverStore } from "../state/hover";
 
 type Props = {
   nodeId: string;
@@ -15,10 +16,14 @@ export function NodeCard({ nodeId, snapshot, onRemove, canRemove }: Props) {
   const color = colorForNode(nodeId);
   const stored = snapshot.data[nodeId] ?? {};
   const keys = Object.keys(stored).sort();
+  const setHoveredNode = useHoverStore((s) => s.setHoveredNode);
+  const setHoveredKey = useHoverStore((s) => s.setHoveredKey);
 
   return (
     <motion.div
       data-node-card-id={nodeId}
+      onMouseEnter={() => setHoveredNode(nodeId)}
+      onMouseLeave={() => setHoveredNode(null)}
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -56,7 +61,12 @@ export function NodeCard({ nodeId, snapshot, onRemove, canRemove }: Props) {
         <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto text-[11px] text-neutral-300">
           {keys.length === 0 && <li className="text-neutral-600">no keys</li>}
           {keys.map((k) => (
-            <li key={k} className="flex justify-between gap-2">
+            <li
+              key={k}
+              onMouseEnter={() => setHoveredKey(k)}
+              onMouseLeave={() => setHoveredKey(null)}
+              className="flex justify-between gap-2"
+            >
               <span className="truncate">{k}</span>
               <span className="text-neutral-500">{stored[k]}</span>
             </li>
