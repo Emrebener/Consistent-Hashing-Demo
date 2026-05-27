@@ -18,6 +18,7 @@ export function NodeCard({ nodeId, snapshot, onRemove, canRemove }: Props) {
 
   return (
     <motion.div
+      data-node-card-id={nodeId}
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}

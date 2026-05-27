@@ -3,6 +3,7 @@ import { ControlsPanel } from "./components/ControlsPanel";
 import { NodeInspector } from "./components/NodeInspector";
 import { RingCanvas } from "./components/RingCanvas";
 import { CalcPanel } from "./components/CalcPanel";
+import { DropOverlay } from "./components/DropOverlay";
 
 export default function App() {
   const snapshot = useRingStore((s) => s.snapshot);
@@ -41,6 +42,7 @@ export default function App() {
         <p className="mb-2 text-xs uppercase tracking-wider text-neutral-500">Nodes</p>
         <NodeInspector />
       </footer>
+      <DropOverlay />
     </div>
   );
 }
