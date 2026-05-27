@@ -1,6 +1,16 @@
 import { hashKey } from "./hash";
+import { murmur3_32 } from "./murmur";
 import type { CoreEvent, HashTrace } from "./events";
 import type { NodeId, RingSnapshot, Token } from "./types";
+
+/**
+ * Position of vnode `index` for `nodeId` on the 2^32 ring. Uses Murmur3
+ * (not FNV-1a) so consecutive indices on the same node spread evenly across
+ * the ring instead of clustering.
+ */
+function tokenPosition(nodeId: NodeId, index: number): number {
+  return murmur3_32(`${nodeId}#${index}`);
+}
 
 export type RingConfig = {
   vnodesPerNode: number;
@@ -111,8 +121,7 @@ export class Ring {
     this.nodeIds.push(nodeId);
     this.data.set(nodeId, new Map());
     for (let i = 0; i < this.vnodesPerNode; i++) {
-      const position = hashKey(`${nodeId}#${i}`);
-      this.tokens.push({ position, vnodeIndex: i, nodeId });
+      this.tokens.push({ position: tokenPosition(nodeId, i), vnodeIndex: i, nodeId });
     }
     this.tokens.sort((a, b) => a.position - b.position);
 
@@ -161,7 +170,7 @@ export class Ring {
     this.tokens = [];
     for (const nodeId of this.nodeIds) {
       for (let i = 0; i < n; i++) {
-        this.tokens.push({ position: hashKey(`${nodeId}#${i}`), vnodeIndex: i, nodeId });
+        this.tokens.push({ position: tokenPosition(nodeId, i), vnodeIndex: i, nodeId });
       }
     }
     this.tokens.sort((a, b) => a.position - b.position);
