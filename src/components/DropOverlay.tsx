@@ -20,22 +20,25 @@ function positionToAngle(position: number): number {
   return (position / 2 ** 32) * Math.PI * 2 - Math.PI / 2;
 }
 
-/** Converts a ring position to screen coordinates by reading the live SVG element. */
+/**
+ * Converts a ring position to screen coordinates by asking the SVG itself
+ * via getScreenCTM(). The matrix already accounts for the viewBox mapping,
+ * the SVG's rendered size, and any pan/zoom transform applied to the
+ * #ring-content group — so this stays correct under zoom and pan.
+ */
 function ringPositionToScreen(position: number): { x: number; y: number } | null {
-  const svg = document.querySelector("svg[aria-label='Consistent hashing ring']") as SVGSVGElement | null;
+  const g = document.querySelector("#ring-content") as SVGGElement | null;
+  if (!g) return null;
+  const svg = g.ownerSVGElement;
   if (!svg) return null;
-  const rect = svg.getBoundingClientRect();
-  // The SVG uses viewBox 0 0 480 480 with preserveAspectRatio default (xMidYMid meet).
-  // Within the rendered SVG box, the viewBox is centered. Compute scale and offsets.
-  const scale = Math.min(rect.width / VIEW, rect.height / VIEW);
-  const drawnW = VIEW * scale;
-  const drawnH = VIEW * scale;
-  const offsetX = rect.left + (rect.width - drawnW) / 2;
-  const offsetY = rect.top + (rect.height - drawnH) / 2;
+  const ctm = g.getScreenCTM();
+  if (!ctm) return null;
+  const pt = svg.createSVGPoint();
   const a = positionToAngle(position);
-  const vbX = CENTER + Math.cos(a) * RING_RADIUS;
-  const vbY = CENTER + Math.sin(a) * RING_RADIUS;
-  return { x: offsetX + vbX * scale, y: offsetY + vbY * scale };
+  pt.x = CENTER + Math.cos(a) * RING_RADIUS;
+  pt.y = CENTER + Math.sin(a) * RING_RADIUS;
+  const out = pt.matrixTransform(ctm);
+  return { x: out.x, y: out.y };
 }
 
 function cardCenter(nodeId: string): { x: number; y: number } | null {
