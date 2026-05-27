@@ -27,6 +27,8 @@ export function RingCanvas() {
   const speed = useRingStore((s) => s.speed);
   const hoveredNodeId = useHoverStore((s) => s.hoveredNodeId);
   const hoveredKey = useHoverStore((s) => s.hoveredKey);
+  const hoveredToken = useHoverStore((s) => s.hoveredToken);
+  const setHoveredToken = useHoverStore((s) => s.setHoveredToken);
 
   const [probe, setProbe] = useState<Probe | null>(null);
 
@@ -54,6 +56,23 @@ export function RingCanvas() {
 
   const probePoint = probe ? ringPoint(probe.trace.position, RING_RADIUS) : null;
 
+  // Keys claimed by the hovered vnode (those whose first clockwise token is it).
+  const keysClaimedByHoveredToken = new Set<string>();
+  if (hoveredToken) {
+    const sorted = snapshot.tokens;
+    for (const k of Object.keys(snapshot.ownership)) {
+      const h = hashKey(k);
+      const claim = sorted.find((t) => t.position >= h) ?? sorted[0];
+      if (
+        claim &&
+        claim.nodeId === hoveredToken.nodeId &&
+        claim.vnodeIndex === hoveredToken.vnodeIndex
+      ) {
+        keysClaimedByHoveredToken.add(k);
+      }
+    }
+  }
+
   return (
     <svg
       viewBox={`0 0 ${VIEW} ${VIEW}`}
@@ -68,6 +87,9 @@ export function RingCanvas() {
         const color = colorForNode(t.nodeId);
         const isReplica = probe?.trace.replicas.includes(t.nodeId) ?? false;
         const isHoveredNode = hoveredNodeId === t.nodeId;
+        const isHoveredToken =
+          hoveredToken?.nodeId === t.nodeId && hoveredToken?.vnodeIndex === t.vnodeIndex;
+        const radius = isHoveredToken ? 8 : isReplica || isHoveredNode ? 7 : 4;
         return (
           <motion.circle
             key={`${t.nodeId}#${t.vnodeIndex}`}
@@ -75,14 +97,62 @@ export function RingCanvas() {
             cy={p.y}
             r={4}
             fill={color}
-            stroke={isHoveredNode ? "#ffffff" : "#0a0a0a"}
-            strokeWidth={isHoveredNode ? 1.5 : 1}
+            stroke={isHoveredToken || isHoveredNode ? "#ffffff" : "#0a0a0a"}
+            strokeWidth={isHoveredToken ? 2 : isHoveredNode ? 1.5 : 1}
             initial={{ r: 0 }}
-            animate={{ r: isReplica || isHoveredNode ? 7 : 4 }}
+            animate={{ r: radius }}
             transition={{ duration: 0.18 }}
+            style={{ cursor: "pointer" }}
+            onMouseEnter={() =>
+              setHoveredToken({ nodeId: t.nodeId, vnodeIndex: t.vnodeIndex })
+            }
+            onMouseLeave={() => setHoveredToken(null)}
           />
         );
       })}
+
+      {hoveredToken && (() => {
+        const token = snapshot.tokens.find(
+          (t) =>
+            t.nodeId === hoveredToken.nodeId && t.vnodeIndex === hoveredToken.vnodeIndex
+        );
+        if (!token) return null;
+        const tokenPt = ringPoint(token.position, RING_RADIUS);
+        const labelAngle = positionToAngle(token.position);
+        const labelPt = {
+          x: CENTER + Math.cos(labelAngle) * (RING_RADIUS + 18),
+          y: CENTER + Math.sin(labelAngle) * (RING_RADIUS + 18),
+        };
+        return (
+          <g style={{ pointerEvents: "none" }}>
+            {Array.from(keysClaimedByHoveredToken).map((key) => {
+              const point = ringPoint(hashKey(key), RING_RADIUS - 12);
+              return (
+                <line
+                  key={`claim-${key}`}
+                  x1={tokenPt.x}
+                  y1={tokenPt.y}
+                  x2={point.x}
+                  y2={point.y}
+                  stroke="#ffffff"
+                  strokeOpacity={0.55}
+                  strokeWidth={1.2}
+                />
+              );
+            })}
+            <text
+              x={labelPt.x}
+              y={labelPt.y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={11}
+              fill="#ffffff"
+            >
+              {hoveredToken.nodeId} #{hoveredToken.vnodeIndex}
+            </text>
+          </g>
+        );
+      })()}
 
       {hoveredKey && snapshot.ownership[hoveredKey] && (
         <g>
@@ -121,19 +191,21 @@ export function RingCanvas() {
         if (!owners || owners.length === 0) return null;
         const color = colorForNode(owners[0]);
         const isHovered = hoveredKey === k;
+        const isClaimedByHoveredToken = keysClaimedByHoveredToken.has(k);
+        const lit = isHovered || isClaimedByHoveredToken;
         const p = ringPoint(hashKey(k), RING_RADIUS - 12);
         return (
           <g key={`k-${k}`}>
             <circle
               cx={p.x}
               cy={p.y}
-              r={isHovered ? 5 : 2.5}
+              r={lit ? 5 : 2.5}
               fill={color}
-              opacity={isHovered ? 1 : 0.7}
-              stroke={isHovered ? "#ffffff" : "none"}
-              strokeWidth={isHovered ? 1 : 0}
+              opacity={lit ? 1 : 0.7}
+              stroke={lit ? "#ffffff" : "none"}
+              strokeWidth={lit ? 1 : 0}
             />
-            {isHovered && (
+            {lit && (
               <text
                 x={p.x}
                 y={p.y - 10}
