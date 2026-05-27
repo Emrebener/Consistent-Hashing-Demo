@@ -120,11 +120,33 @@ export function RingCanvas() {
         const owners = snapshot.ownership[k];
         if (!owners || owners.length === 0) return null;
         const color = colorForNode(owners[0]);
-        const firstOwner = owners[0];
-        const firstToken = snapshot.tokens.find((t) => t.nodeId === firstOwner);
-        if (!firstToken) return null;
-        const p = ringPoint(firstToken.position, RING_RADIUS - 12);
-        return <circle key={`k-${k}`} cx={p.x} cy={p.y} r={2.5} fill={color} opacity={0.7} />;
+        const isHovered = hoveredKey === k;
+        const p = ringPoint(hashKey(k), RING_RADIUS - 12);
+        return (
+          <g key={`k-${k}`}>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={isHovered ? 5 : 2.5}
+              fill={color}
+              opacity={isHovered ? 1 : 0.7}
+              stroke={isHovered ? "#ffffff" : "none"}
+              strokeWidth={isHovered ? 1 : 0}
+            />
+            {isHovered && (
+              <text
+                x={p.x}
+                y={p.y - 10}
+                textAnchor="middle"
+                fontSize={10}
+                fill="#ffffff"
+                style={{ pointerEvents: "none" }}
+              >
+                {k}
+              </text>
+            )}
+          </g>
+        );
       })}
 
       {/* Probe */}
