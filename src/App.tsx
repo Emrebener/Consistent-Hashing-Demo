@@ -1,7 +1,38 @@
+import { useRingStore } from "./state/store";
+
 export default function App() {
+  const snapshot = useRingStore((s) => s.snapshot);
+
   return (
-    <div className="grid h-full place-items-center text-neutral-400">
-      <p>Consistent Hashing Demo — scaffolding ok.</p>
+    <div className="flex h-full flex-col bg-neutral-950 text-neutral-100">
+      <header className="flex items-center gap-4 border-b border-neutral-800 px-6 py-3">
+        <h1 className="text-lg font-semibold">Consistent Hashing Demo</h1>
+        <div className="ml-auto flex gap-4 text-xs text-neutral-400">
+          <span>Nodes: {snapshot.nodeIds.length}</span>
+          <span>RF: {snapshot.replicationFactor}</span>
+          <span>vnodes/node: {snapshot.vnodesPerNode}</span>
+        </div>
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_320px]">
+        <aside id="controls-pane" className="border-r border-neutral-800 p-4 overflow-y-auto">
+          <p className="text-xs uppercase tracking-wider text-neutral-500">Controls</p>
+        </aside>
+
+        <main id="ring-pane" className="relative min-h-0 overflow-hidden">
+          <p className="absolute left-4 top-4 text-xs uppercase tracking-wider text-neutral-500">
+            Ring
+          </p>
+        </main>
+
+        <aside id="calc-pane" className="border-l border-neutral-800 p-4 overflow-y-auto">
+          <p className="text-xs uppercase tracking-wider text-neutral-500">Calculation</p>
+        </aside>
+      </div>
+
+      <footer id="inspector-pane" className="border-t border-neutral-800 p-3">
+        <p className="text-xs uppercase tracking-wider text-neutral-500">Nodes</p>
+      </footer>
     </div>
   );
 }
