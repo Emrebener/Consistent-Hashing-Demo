@@ -1,4 +1,5 @@
 import { useRingStore } from "./state/store";
+import { ControlsPanel } from "./components/ControlsPanel";
 import { NodeInspector } from "./components/NodeInspector";
 import { RingCanvas } from "./components/RingCanvas";
 
@@ -18,7 +19,8 @@ export default function App() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_320px]">
         <aside id="controls-pane" className="border-r border-neutral-800 p-4 overflow-y-auto">
-          <p className="text-xs uppercase tracking-wider text-neutral-500">Controls</p>
+          <p className="mb-3 text-xs uppercase tracking-wider text-neutral-500">Controls</p>
+          <ControlsPanel />
         </aside>
 
         <main id="ring-pane" className="relative min-h-0 overflow-hidden">
