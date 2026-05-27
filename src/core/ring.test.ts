@@ -248,3 +248,69 @@ describe("Ring — removeNode", () => {
     }
   });
 });
+
+describe("Ring — setReplicationFactor", () => {
+  it("rejects RF < 1", () => {
+    const r = new Ring({ vnodesPerNode: 4, replicationFactor: 1 });
+    expect(() => r.setReplicationFactor(0)).toThrow(/at least 1/i);
+  });
+
+  it("stores user-chosen RF even if > nodeCount and re-replicates when nodes catch up", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 1 });
+    r.addNode("A");
+    r.addNode("B");
+    r.put("k", "v");
+    r.setReplicationFactor(4); // stored as 4; effective = min(4, 2) = 2
+    expect(r.snapshot().ownership["k"]).toHaveLength(2);
+    r.addNode("C"); // effective becomes 3
+    r.addNode("D"); // effective becomes 4
+    expect(r.snapshot().ownership["k"]).toHaveLength(4);
+  });
+
+  it("emits KeyMigrated events for keys whose replica set widened", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 1 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    for (let i = 0; i < 5; i++) r.put(`k${i}`, `v${i}`);
+    const { events } = r.setReplicationFactor(3);
+    expect(events.filter((e) => e.type === "KeyMigrated")).toHaveLength(5);
+  });
+});
+
+describe("Ring — setVnodesPerNode", () => {
+  it("rejects values < 1 or > 64", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 1 });
+    r.addNode("A");
+    expect(() => r.setVnodesPerNode(0)).toThrow();
+    expect(() => r.setVnodesPerNode(65)).toThrow();
+  });
+
+  it("regenerates tokens for all nodes", () => {
+    const r = new Ring({ vnodesPerNode: 4, replicationFactor: 1 });
+    r.addNode("A");
+    r.addNode("B");
+    r.setVnodesPerNode(16);
+    const snap = r.snapshot();
+    expect(snap.tokens).toHaveLength(32);
+    expect(snap.vnodesPerNode).toBe(16);
+    // Still sorted.
+    const positions = snap.tokens.map((t) => t.position);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("preserves every key's value across vnode rebalance", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    for (let i = 0; i < 10; i++) r.put(`k${i}`, `v${i}`);
+    r.setVnodesPerNode(32);
+    const snap = r.snapshot();
+    for (let i = 0; i < 10; i++) {
+      for (const o of snap.ownership[`k${i}`]) {
+        expect(snap.data[o][`k${i}`]).toBe(`v${i}`);
+      }
+    }
+  });
+});

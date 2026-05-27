@@ -144,6 +144,30 @@ export class Ring {
     return { events };
   }
 
+  setReplicationFactor(rf: number): OperationResult {
+    if (!Number.isInteger(rf) || rf < 1) {
+      throw new Error("replicationFactor must be an integer at least 1");
+    }
+    this.replicationFactor = rf;
+    return { events: this.rebalanceAll() };
+  }
+
+  setVnodesPerNode(n: number): OperationResult {
+    if (!Number.isInteger(n) || n < 1 || n > 64) {
+      throw new Error("vnodesPerNode must be an integer between 1 and 64");
+    }
+    this.vnodesPerNode = n;
+    // Rebuild every node's tokens from scratch.
+    this.tokens = [];
+    for (const nodeId of this.nodeIds) {
+      for (let i = 0; i < n; i++) {
+        this.tokens.push({ position: hashKey(`${nodeId}#${i}`), vnodeIndex: i, nodeId });
+      }
+    }
+    this.tokens.sort((a, b) => a.position - b.position);
+    return { events: this.rebalanceAll() };
+  }
+
   put(key: string, value: string): OperationResult {
     const trace = this.trace(key);
     if (trace.replicas.length === 0) {
