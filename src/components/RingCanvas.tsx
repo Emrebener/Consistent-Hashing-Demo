@@ -27,6 +27,7 @@ export function RingCanvas() {
   const speed = useRingStore((s) => s.speed);
   const hoveredNodeId = useHoverStore((s) => s.hoveredNodeId);
   const hoveredKey = useHoverStore((s) => s.hoveredKey);
+  const setHoveredKey = useHoverStore((s) => s.setHoveredKey);
   const hoveredToken = useHoverStore((s) => s.hoveredToken);
   const setHoveredToken = useHoverStore((s) => s.setHoveredToken);
 
@@ -196,6 +197,16 @@ export function RingCanvas() {
         const p = ringPoint(hashKey(k), RING_RADIUS - 12);
         return (
           <g key={`k-${k}`}>
+            {/* Invisible larger hit target so 2.5px dots are easy to hover. */}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={9}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoveredKey(k)}
+              onMouseLeave={() => setHoveredKey(null)}
+            />
             <circle
               cx={p.x}
               cy={p.y}
@@ -204,6 +215,7 @@ export function RingCanvas() {
               opacity={lit ? 1 : 0.7}
               stroke={lit ? "#ffffff" : "none"}
               strokeWidth={lit ? 1 : 0}
+              pointerEvents="none"
             />
             {lit && (
               <text
