@@ -1,5 +1,6 @@
 import { useRingStore } from "./state/store";
 import { NodeInspector } from "./components/NodeInspector";
+import { RingCanvas } from "./components/RingCanvas";
 
 export default function App() {
   const snapshot = useRingStore((s) => s.snapshot);
@@ -21,9 +22,10 @@ export default function App() {
         </aside>
 
         <main id="ring-pane" className="relative min-h-0 overflow-hidden">
-          <p className="absolute left-4 top-4 text-xs uppercase tracking-wider text-neutral-500">
+          <p className="absolute left-4 top-4 z-10 text-xs uppercase tracking-wider text-neutral-500">
             Ring
           </p>
+          <RingCanvas />
         </main>
 
         <aside id="calc-pane" className="border-l border-neutral-800 p-4 overflow-y-auto">
