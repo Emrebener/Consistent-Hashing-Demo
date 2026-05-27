@@ -73,9 +73,11 @@ export function RingCanvas() {
             key={`${t.nodeId}#${t.vnodeIndex}`}
             cx={p.x}
             cy={p.y}
+            r={4}
             fill={color}
             stroke={isHoveredNode ? "#ffffff" : "#0a0a0a"}
             strokeWidth={isHoveredNode ? 1.5 : 1}
+            initial={{ r: 0 }}
             animate={{ r: isReplica || isHoveredNode ? 7 : 4 }}
             transition={{ duration: 0.18 }}
           />
