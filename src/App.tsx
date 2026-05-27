@@ -2,6 +2,7 @@ import { useRingStore } from "./state/store";
 import { ControlsPanel } from "./components/ControlsPanel";
 import { NodeInspector } from "./components/NodeInspector";
 import { RingCanvas } from "./components/RingCanvas";
+import { CalcPanel } from "./components/CalcPanel";
 
 export default function App() {
   const snapshot = useRingStore((s) => s.snapshot);
@@ -31,7 +32,8 @@ export default function App() {
         </main>
 
         <aside id="calc-pane" className="border-l border-neutral-800 p-4 overflow-y-auto">
-          <p className="text-xs uppercase tracking-wider text-neutral-500">Calculation</p>
+          <p className="mb-3 text-xs uppercase tracking-wider text-neutral-500">Calculation</p>
+          <CalcPanel />
         </aside>
       </div>
 
