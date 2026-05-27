@@ -89,6 +89,38 @@ export class Ring {
     return { events };
   }
 
+  put(key: string, value: string): OperationResult {
+    const trace = this.trace(key);
+    if (trace.replicas.length === 0) {
+      // Empty ring — no-op.
+      return { events: [] };
+    }
+    const previous = this.ownership.get(key) ?? [];
+
+    // Remove the key from any node that is no longer a replica.
+    for (const oldOwner of previous) {
+      if (!trace.replicas.includes(oldOwner)) {
+        this.data.get(oldOwner)?.delete(key);
+      }
+    }
+    // Write to every current replica.
+    for (const owner of trace.replicas) {
+      this.data.get(owner)!.set(key, value);
+    }
+    this.ownership.set(key, [...trace.replicas]);
+
+    return { events: [{ type: "KeyWritten", trace, value }] };
+  }
+
+  get(key: string): OperationResult {
+    const trace = this.trace(key);
+    let value: string | undefined;
+    if (trace.replicas.length > 0) {
+      value = this.data.get(trace.replicas[0])?.get(key);
+    }
+    return { events: [{ type: "KeyRead", trace, value }] };
+  }
+
   // ---------- internal helpers (unused for now; here so later tasks can grow them) ----------
 
   protected getEffectiveRf(): number {

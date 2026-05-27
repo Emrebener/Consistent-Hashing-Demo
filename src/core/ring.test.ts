@@ -100,3 +100,73 @@ describe("Ring — lookupReplicas", () => {
     expect(foundWrap).toBe(true);
   });
 });
+
+describe("Ring — put / get", () => {
+  it("stores a key on all effective-RF replicas", () => {
+    const r = new Ring({ vnodesPerNode: 16, replicationFactor: 3 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    r.addNode("D");
+
+    const { events } = r.put("alice", "value-1");
+    const snap = r.snapshot();
+
+    expect(snap.ownership["alice"]).toHaveLength(3);
+    for (const replica of snap.ownership["alice"]) {
+      expect(snap.data[replica]["alice"]).toBe("value-1");
+    }
+    const written = events.find((e) => e.type === "KeyWritten");
+    expect(written).toBeTruthy();
+    if (written && written.type === "KeyWritten") {
+      expect(written.value).toBe("value-1");
+      expect(written.trace.key).toBe("alice");
+      expect(written.trace.replicas).toEqual(snap.ownership["alice"]);
+    }
+  });
+
+  it("get returns the stored value", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    r.put("k", "v");
+    const { events } = r.get("k");
+    const read = events.find((e) => e.type === "KeyRead");
+    expect(read).toBeTruthy();
+    if (read && read.type === "KeyRead") {
+      expect(read.value).toBe("v");
+      expect(read.trace.key).toBe("k");
+    }
+  });
+
+  it("get returns undefined for an unknown key", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 2 });
+    r.addNode("A");
+    const { events } = r.get("nope");
+    const read = events.find((e) => e.type === "KeyRead");
+    expect(read).toBeTruthy();
+    if (read && read.type === "KeyRead") {
+      expect(read.value).toBeUndefined();
+    }
+  });
+
+  it("put on an empty ring is a no-op and emits no KeyWritten", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 2 });
+    const { events } = r.put("orphan", "v");
+    expect(events.find((e) => e.type === "KeyWritten")).toBeFalsy();
+    expect(r.snapshot().ownership["orphan"]).toBeUndefined();
+  });
+
+  it("overwriting a key updates value on all current replicas", () => {
+    const r = new Ring({ vnodesPerNode: 16, replicationFactor: 3 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    r.put("k", "v1");
+    r.put("k", "v2");
+    const snap = r.snapshot();
+    for (const replica of snap.ownership["k"]) {
+      expect(snap.data[replica]["k"]).toBe("v2");
+    }
+  });
+});
