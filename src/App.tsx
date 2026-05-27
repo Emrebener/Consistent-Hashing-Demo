@@ -1,4 +1,5 @@
 import { useRingStore } from "./state/store";
+import { NodeInspector } from "./components/NodeInspector";
 
 export default function App() {
   const snapshot = useRingStore((s) => s.snapshot);
@@ -31,7 +32,8 @@ export default function App() {
       </div>
 
       <footer id="inspector-pane" className="border-t border-neutral-800 p-3">
-        <p className="text-xs uppercase tracking-wider text-neutral-500">Nodes</p>
+        <p className="mb-2 text-xs uppercase tracking-wider text-neutral-500">Nodes</p>
+        <NodeInspector />
       </footer>
     </div>
   );
