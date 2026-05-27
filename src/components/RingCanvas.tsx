@@ -197,12 +197,15 @@ export function RingCanvas() {
         const p = ringPoint(hashKey(k), RING_RADIUS - 12);
         return (
           <g key={`k-${k}`}>
-            {/* Invisible larger hit target so 2.5px dots are easy to hover. */}
+            {/* Invisible larger hit target so 2.5px dots are easy to hover.
+                pointer-events="all" is required because SVG's default
+                visiblePainted skips transparent fills. */}
             <circle
               cx={p.x}
               cy={p.y}
               r={9}
               fill="transparent"
+              pointerEvents="all"
               style={{ cursor: "pointer" }}
               onMouseEnter={() => setHoveredKey(k)}
               onMouseLeave={() => setHoveredKey(null)}
