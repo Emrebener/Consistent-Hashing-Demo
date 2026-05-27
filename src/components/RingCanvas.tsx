@@ -57,18 +57,31 @@ export function RingCanvas() {
 
   const probePoint = probe ? ringPoint(probe.trace.position, RING_RADIUS) : null;
 
-  // Keys claimed by the hovered vnode (those whose first clockwise token is it).
+  // Keys hosted by the hovered vnode. A vnode hosts a key when it is the
+  // closest-clockwise vnode of its physical node from the key's hash — and
+  // that physical node is one of the key's RF replicas. This is exactly the
+  // inverse of the key→vnode arcs the key-hover affordance draws.
   const keysClaimedByHoveredToken = new Set<string>();
   if (hoveredToken) {
-    const sorted = snapshot.tokens;
     for (const k of Object.keys(snapshot.ownership)) {
+      const owners = snapshot.ownership[k];
+      if (!owners.includes(hoveredToken.nodeId)) continue;
       const h = hashKey(k);
-      const claim = sorted.find((t) => t.position >= h) ?? sorted[0];
-      if (
-        claim &&
-        claim.nodeId === hoveredToken.nodeId &&
-        claim.vnodeIndex === hoveredToken.vnodeIndex
-      ) {
+      const candidates = snapshot.tokens.filter(
+        (t) => t.nodeId === hoveredToken.nodeId
+      );
+      if (candidates.length === 0) continue;
+      const best = candidates.reduce(
+        (acc, t) => {
+          const dist = (t.position - h + 2 ** 32) % 2 ** 32;
+          return dist < acc.dist ? { t, dist } : acc;
+        },
+        {
+          t: candidates[0],
+          dist: (candidates[0].position - h + 2 ** 32) % 2 ** 32,
+        }
+      );
+      if (best.t.vnodeIndex === hoveredToken.vnodeIndex) {
         keysClaimedByHoveredToken.add(k);
       }
     }
