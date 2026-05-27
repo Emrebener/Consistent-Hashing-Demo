@@ -74,6 +74,27 @@ export function RingCanvas() {
     }
   }
 
+  // Replica vnodes for the hovered key (closest-clockwise vnode per owner).
+  const vnodesLitByHoveredKey = new Set<string>(); // `${nodeId}#${vnodeIndex}`
+  if (hoveredKey && snapshot.ownership[hoveredKey]) {
+    const keyHash = hashKey(hoveredKey);
+    for (const ownerId of snapshot.ownership[hoveredKey]) {
+      const candidates = snapshot.tokens.filter((t) => t.nodeId === ownerId);
+      if (candidates.length === 0) continue;
+      const best = candidates.reduce(
+        (acc, t) => {
+          const dist = (t.position - keyHash + 2 ** 32) % 2 ** 32;
+          return dist < acc.dist ? { t, dist } : acc;
+        },
+        {
+          t: candidates[0],
+          dist: (candidates[0].position - keyHash + 2 ** 32) % 2 ** 32,
+        }
+      );
+      vnodesLitByHoveredKey.add(`${best.t.nodeId}#${best.t.vnodeIndex}`);
+    }
+  }
+
   return (
     <svg
       viewBox={`0 0 ${VIEW} ${VIEW}`}
@@ -90,7 +111,15 @@ export function RingCanvas() {
         const isHoveredNode = hoveredNodeId === t.nodeId;
         const isHoveredToken =
           hoveredToken?.nodeId === t.nodeId && hoveredToken?.vnodeIndex === t.vnodeIndex;
-        const radius = isHoveredToken ? 8 : isReplica || isHoveredNode ? 7 : 4;
+        const isLitByKey = vnodesLitByHoveredKey.has(`${t.nodeId}#${t.vnodeIndex}`);
+        const radius = isHoveredToken
+          ? 8
+          : isLitByKey
+            ? 7
+            : isReplica || isHoveredNode
+              ? 7
+              : 4;
+        const litStroke = isHoveredToken || isHoveredNode || isLitByKey;
         return (
           <motion.circle
             key={`${t.nodeId}#${t.vnodeIndex}`}
@@ -98,8 +127,8 @@ export function RingCanvas() {
             cy={p.y}
             r={4}
             fill={color}
-            stroke={isHoveredToken || isHoveredNode ? "#ffffff" : "#0a0a0a"}
-            strokeWidth={isHoveredToken ? 2 : isHoveredNode ? 1.5 : 1}
+            stroke={litStroke ? "#ffffff" : "#0a0a0a"}
+            strokeWidth={isHoveredToken ? 2 : litStroke ? 1.5 : 1}
             initial={{ r: 0 }}
             animate={{ r: radius }}
             transition={{ duration: 0.18 }}
@@ -197,13 +226,16 @@ export function RingCanvas() {
         const p = ringPoint(hashKey(k), RING_RADIUS - 12);
         return (
           <g key={`k-${k}`}>
-            {/* Invisible larger hit target so 2.5px dots are easy to hover.
+            {/* Invisible hit target sized to bridge the radial gap between
+                the key dot (at radius RING_RADIUS - 12) and the ring track
+                (at radius RING_RADIUS). Without this the user falls into a
+                dead zone and lands on the vnode hover instead.
                 pointer-events="all" is required because SVG's default
                 visiblePainted skips transparent fills. */}
             <circle
               cx={p.x}
               cy={p.y}
-              r={9}
+              r={13}
               fill="transparent"
               pointerEvents="all"
               style={{ cursor: "pointer" }}
