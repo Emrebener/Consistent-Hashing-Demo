@@ -170,3 +170,81 @@ describe("Ring — put / get", () => {
     }
   });
 });
+
+describe("Ring — addNode migrates existing keys", () => {
+  it("emits KeyMigrated only for keys whose replica set changed", () => {
+    const r = new Ring({ vnodesPerNode: 16, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    for (let i = 0; i < 20; i++) r.put(`k${i}`, `v${i}`);
+    const before = r.snapshot();
+
+    const { events } = r.addNode("C");
+    const after = r.snapshot();
+
+    const migrated = events.filter((e) => e.type === "KeyMigrated");
+    // Determine which keys actually moved.
+    let actuallyChanged = 0;
+    for (const key of Object.keys(before.ownership)) {
+      const beforeOwners = before.ownership[key].slice().sort().join(",");
+      const afterOwners = (after.ownership[key] ?? []).slice().sort().join(",");
+      if (beforeOwners !== afterOwners) actuallyChanged++;
+    }
+    expect(migrated.length).toBe(actuallyChanged);
+  });
+
+  it("preserves every key's value across migration", () => {
+    const r = new Ring({ vnodesPerNode: 16, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    for (let i = 0; i < 20; i++) r.put(`k${i}`, `v${i}`);
+    r.addNode("C");
+    const snap = r.snapshot();
+    for (let i = 0; i < 20; i++) {
+      const owners = snap.ownership[`k${i}`];
+      expect(owners.length).toBe(2);
+      for (const o of owners) {
+        expect(snap.data[o][`k${i}`]).toBe(`v${i}`);
+      }
+    }
+  });
+});
+
+describe("Ring — removeNode", () => {
+  it("rejects removing an unknown node", () => {
+    const r = new Ring({ vnodesPerNode: 4, replicationFactor: 1 });
+    r.addNode("A");
+    expect(() => r.removeNode("ghost")).toThrow(/does not exist/i);
+  });
+
+  it("removes all of the node's vnodes and its data entry", () => {
+    const r = new Ring({ vnodesPerNode: 8, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    r.put("k", "v");
+    r.removeNode("B");
+    const snap = r.snapshot();
+    expect(snap.nodeIds).not.toContain("B");
+    expect(snap.data["B"]).toBeUndefined();
+    expect(snap.tokens.every((t) => t.nodeId !== "B")).toBe(true);
+  });
+
+  it("reassigns every key the removed node held", () => {
+    const r = new Ring({ vnodesPerNode: 32, replicationFactor: 2 });
+    r.addNode("A");
+    r.addNode("B");
+    r.addNode("C");
+    for (let i = 0; i < 30; i++) r.put(`k${i}`, `v${i}`);
+    r.removeNode("B");
+    const snap = r.snapshot();
+    for (let i = 0; i < 30; i++) {
+      const owners = snap.ownership[`k${i}`];
+      expect(owners).not.toContain("B");
+      expect(owners.length).toBe(2);
+      for (const o of owners) {
+        expect(snap.data[o][`k${i}`]).toBe(`v${i}`);
+      }
+    }
+  });
+});

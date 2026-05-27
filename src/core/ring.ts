@@ -70,6 +70,40 @@ export class Ring {
 
   // ---------- public write ----------
 
+  /**
+   * Recomputes replica sets for every stored key against the current tokens/RF,
+   * physically migrates data, and emits one KeyMigrated event per key whose
+   * replica set actually changed. Used by addNode, removeNode, and the slider
+   * setters.
+   */
+  private rebalanceAll(): CoreEvent[] {
+    const events: CoreEvent[] = [];
+    for (const [key, oldOwners] of this.ownership) {
+      const newOwners = this.lookupReplicas(hashKey(key));
+      const sameSet =
+        oldOwners.length === newOwners.length &&
+        oldOwners.slice().sort().join(",") === newOwners.slice().sort().join(",");
+      if (sameSet) continue;
+
+      // Capture the value before mutating (it exists on every old owner).
+      const value = this.data.get(oldOwners[0])?.get(key);
+
+      // Remove from previous owners that are no longer replicas.
+      for (const o of oldOwners) {
+        if (!newOwners.includes(o)) this.data.get(o)?.delete(key);
+      }
+      // Add to new owners.
+      for (const o of newOwners) {
+        if (value !== undefined && !this.data.get(o)?.has(key)) {
+          this.data.get(o)!.set(key, value);
+        }
+      }
+      this.ownership.set(key, [...newOwners]);
+      events.push({ type: "KeyMigrated", key, from: [...oldOwners], to: [...newOwners] });
+    }
+    return events;
+  }
+
   addNode(nodeId: NodeId): OperationResult {
     if (this.nodeIds.includes(nodeId)) {
       throw new Error(`Node "${nodeId}" already exists`);
@@ -83,9 +117,30 @@ export class Ring {
     this.tokens.sort((a, b) => a.position - b.position);
 
     const events: CoreEvent[] = [{ type: "NodeAdded", nodeId }];
-    // Key-migration logic is added in Task 6 (once put/get exist in Task 5).
-    // For the first addNode there are no stored keys to migrate yet, so just
-    // emit NodeAdded.
+    events.push(...this.rebalanceAll());
+    return { events };
+  }
+
+  removeNode(nodeId: NodeId): OperationResult {
+    if (!this.nodeIds.includes(nodeId)) {
+      throw new Error(`Node "${nodeId}" does not exist`);
+    }
+    this.nodeIds = this.nodeIds.filter((n) => n !== nodeId);
+    this.tokens = this.tokens.filter((t) => t.nodeId !== nodeId);
+    this.data.delete(nodeId);
+
+    const events: CoreEvent[] = [{ type: "NodeRemoved", nodeId }];
+
+    // For keys whose old owners now reference the dropped node, fix up first.
+    for (const [key, owners] of this.ownership) {
+      if (owners.includes(nodeId)) {
+        this.ownership.set(
+          key,
+          owners.filter((o) => o !== nodeId)
+        );
+      }
+    }
+    events.push(...this.rebalanceAll());
     return { events };
   }
 
